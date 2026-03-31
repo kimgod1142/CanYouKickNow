@@ -19,12 +19,19 @@ local VERSION    = "1.0.0"
 -- ⚠️ CKYN global — UI.lua에서도 참조
 CKYN = {
     -- [unitID] = {
-    --   name, class, spellID, cd, endTime,
-    --   confirmed,  -- true: 실제 보유 확인됨 / false: 특성 미확인
-    --   specID,     -- Inspect 후 확정된 specID (없으면 nil)
+    --   name      : 플레이어 이름 (서버명 제외)
+    --   class     : 직업 파일명 ("WARRIOR" 등)
+    --   spellID   : 차단 스킬 ID (nil = 차단 없음 확정 or API 한계)
+    --   cd        : 쿨타임 (초). Inspect 쿨 감소 특성 확인 시 조정됨
+    --   endTime   : castTime + cd (0 = 아직 사용 안 함 = READY)
+    --   confirmed : true  = 보유 확정 (기본 스킬 or Inspect or 실제 사용)
+    --               false = 특성 미확인 ("?" 표시)
+    --   noKick    : true  = 차단 없음 확정 (신성 성기사, 보존 기원사 등)
+    --   apiLimit  : true  = 흑마법사 등 API 한계로 추적 불가
+    --   specID    : Inspect 후 확정된 specID
     -- }
-    roster      = {},
-    inMythicPlus = false,  -- 현재 M+ 중 여부
+    roster       = {},
+    inMythicPlus = false,
 }
 
 -- ================================================================
@@ -121,14 +128,24 @@ local function ResolvePlayerSpell()
 end
 
 -- 타인: 클래스 기반 기본값 (Inspect 전 상태)
--- talent=false → confirmed=true, talent=true → confirmed=false ("?" 표시)
+-- talent=false → confirmed=true (기본 스킬, 무조건 보유)
+-- talent=true  → confirmed=false ("?" 표시)
+-- WARLOCK      → apiLimit=true
 local function ResolveClassDefault(classFile)
+    -- 흑마법사: API 한계
+    if classFile == "WARLOCK" then
+        return nil, false, true  -- spellID, confirmed, apiLimit
+    end
+
     local spells = CKYN_CLASS_DEFAULT[classFile]
-    if not spells or #spells == 0 then return nil, false end
-    local sid = spells[1]
+    if not spells or #spells == 0 then
+        return nil, true, false  -- 차단 없음 확정 (사제 etc는 Inspect 후 분기)
+    end
+
+    local sid  = spells[1]
     local data = CKYN_SPELLS[sid]
     local confirmed = data and (data.talent == false)
-    return sid, confirmed
+    return sid, confirmed, false
 end
 
 local function BuildRoster()
@@ -149,22 +166,24 @@ local function BuildRoster()
         local _, classFile = UnitClass(unitID)
         if not name or not classFile then goto continue end
 
-        local spellID, confirmed
+        local spellID, confirmed, apiLimit, noKick
 
         if unitID == "player" then
             spellID, confirmed = ResolvePlayerSpell()
+            apiLimit = false
+            noKick   = (spellID == nil)
         else
             -- 이전에 Inspect로 specID 확정됐으면 재사용
             local p = prev[unitID]
             if p and p.specID then
+                -- CKYN_SPEC_INTERRUPT에 등록된 스펙: 결과 확정
                 spellID   = CKYN_SPEC_INTERRUPT[p.specID]
-                confirmed = (spellID ~= nil)
-                -- spellID가 nil인 스펙(사제 등)도 confirmed=true로 처리 (차단 없음 확정)
-                if CKYN_SPEC_INTERRUPT[p.specID] == nil and p.specID then
-                    confirmed = true
-                end
+                confirmed = true   -- specID 자체가 확정됐으면 차단 없음도 confirmed
+                noKick    = (spellID == nil)
+                apiLimit  = false
             else
-                spellID, confirmed = ResolveClassDefault(classFile)
+                spellID, confirmed, apiLimit = ResolveClassDefault(classFile)
+                noKick = (not apiLimit and spellID == nil and confirmed)
             end
         end
 
@@ -185,6 +204,8 @@ local function BuildRoster()
             cd        = cd,
             endTime   = endTime,
             confirmed = confirmed,
+            noKick    = noKick,
+            apiLimit  = apiLimit,
             specID    = specID,
         }
 
@@ -223,17 +244,30 @@ local function OnInspectReady(guid)
     if entry and specID and specID > 0 then
         entry.specID = specID
 
-        -- CKYN_SPEC_INTERRUPT에 명시적으로 등록된 스펙이면 확정
-        if CKYN_SPEC_INTERRUPT[specID] ~= nil or
-           (CKYN_SPEC_INTERRUPT[specID] == nil and specID ~= nil) then
-            local newSpell = CKYN_SPEC_INTERRUPT[specID]
-            entry.spellID  = newSpell  -- nil 가능 (차단 없는 스펙)
-            entry.confirmed = true     -- 스펙 확인됨 = 보유 여부 확정
-            if newSpell then
-                local data = CKYN_SPELLS[newSpell]
-                entry.cd = data and data.cd or entry.cd
+        local newSpell    = CKYN_SPEC_INTERRUPT[specID]
+        entry.spellID     = newSpell
+        entry.confirmed   = true
+        entry.noKick      = (newSpell == nil)
+        entry.apiLimit    = false
+
+        if newSpell then
+            local data = CKYN_SPELLS[newSpell]
+            entry.cd   = data and data.cd or entry.cd
+
+            -- 쿨 감소 특성 확인 (CKYN_CD_REDUCE)
+            -- Inspect 대상 유닛의 특성을 IsPlayerSpell로는 확인 불가
+            -- → GetInspectSpecialization만으론 개별 특성 노드 확인 어려움
+            -- → 현재 구현 방식: 본인(player)만 로그인 시 적용, 타인은 기본 cd 사용
+            if targetUnit == "player" then
+                for _, r in ipairs(CKYN_CD_REDUCE) do
+                    if r.spell == newSpell and IsPlayerSpell(r.talent) then
+                        entry.cd = r.reducedCD
+                        break
+                    end
+                end
             end
         end
+
         CKYN_UI_Refresh()
     end
 

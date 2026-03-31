@@ -216,6 +216,13 @@ local function MakeRow(parent)
     row.noneText:SetText("|cff666666— 차단 없음|r")
     row.noneText:Hide()
 
+    -- "API 한계" 텍스트: 흑마법사 등 추적 불가
+    row.apiLimitText = bar:CreateFontString(nil, "OVERLAY")
+    row.apiLimitText:SetFont(font, 11)
+    row.apiLimitText:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    row.apiLimitText:SetText("|cff555555— 추적 불가|r")
+    row.apiLimitText:Hide()
+
     return row
 end
 
@@ -229,6 +236,7 @@ local function GetRow(parent)
     row.readyText:Hide()
     row.unknownText:Hide()
     row.noneText:Hide()
+    row.apiLimitText:Hide()
     return row
 end
 
@@ -245,20 +253,31 @@ updateFrame:SetScript("OnUpdate", function()
     if #activeRows == 0 then return end
     local now = GetTime()
     for _, row in ipairs(activeRows) do
-        -- 차단 스킬 없는 직업
-        if row.noSpell then
+        -- API 한계 (흑마법사 등)
+        if row.apiLimit then
             row.bar:SetValue(0)
             row.cdText:Hide()
             row.readyText:Hide()
             row.unknownText:Hide()
+            row.noneText:Hide()
+            row.apiLimitText:Show()
+
+        -- 차단 스킬 없는 직업 (신성 성기사, 보존 기원사 등)
+        elseif row.noSpell then
+            row.bar:SetValue(0)
+            row.cdText:Hide()
+            row.readyText:Hide()
+            row.unknownText:Hide()
+            row.apiLimitText:Hide()
             row.noneText:Show()
 
-        -- 특성 미확인 (talent 직업 타인)
+        -- 특성 미확인 (talent 직업 타인, Inspect 전)
         elseif not row.confirmed then
             row.bar:SetValue(0)
             row.cdText:Hide()
             row.readyText:Hide()
             row.noneText:Hide()
+            row.apiLimitText:Hide()
             row.unknownText:Show()
 
         -- 쿨타임 중
@@ -271,6 +290,7 @@ updateFrame:SetScript("OnUpdate", function()
             row.readyText:Hide()
             row.unknownText:Hide()
             row.noneText:Hide()
+            row.apiLimitText:Hide()
 
         -- 사용 가능
         else
@@ -278,6 +298,7 @@ updateFrame:SetScript("OnUpdate", function()
             row.cdText:Hide()
             row.unknownText:Hide()
             row.noneText:Hide()
+            row.apiLimitText:Hide()
             row.readyText:Show()
         end
     end
@@ -317,7 +338,8 @@ local function RebuildRows()
             row.totalCD   = entry.cd
             row.endTime   = entry.endTime or 0
             row.confirmed = entry.confirmed
-            row.noSpell   = (entry.spellID == nil)
+            row.noSpell   = entry.noKick   or false
+            row.apiLimit  = entry.apiLimit or false
 
             activeRows[#activeRows + 1] = row
             yOff = yOff - rowH - gap

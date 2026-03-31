@@ -11,4 +11,5 @@
 
 SpellDB.lua
 UI.lua
+Options.lua
 CanYouKickNow.lua

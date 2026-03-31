@@ -332,15 +332,80 @@ local function OnLeaveMythicPlus()
 end
 
 -- ================================================================
+-- TEST MODE
+-- /ckn test → 모든 UI 상태를 한눈에 확인할 수 있는 가짜 파티 데이터 주입
+-- ================================================================
+local TEST_DATA = {
+    -- 상태별 대표 케이스 5종
+    { name = "Kickmaster",   class = "WARRIOR",     spellID = 6552,   cd = 15,  endTime = 0,   confirmed = true,  noKick = false, apiLimit = false }, -- READY
+    { name = "SlowKicker",   class = "ROGUE",        spellID = 1766,   cd = 15,  endTime = 8,   confirmed = true,  noKick = false, apiLimit = false }, -- 쿨 중 (8초 후 기준)
+    { name = "MaybeKick",    class = "PALADIN",      spellID = 96231,  cd = 15,  endTime = 0,   confirmed = false, noKick = false, apiLimit = false }, -- 특성 미확인
+    { name = "HolyNoKick",   class = "PRIEST",       spellID = nil,    cd = 0,   endTime = 0,   confirmed = true,  noKick = true,  apiLimit = false }, -- 차단 없음
+    { name = "Demonlock",    class = "WARLOCK",      spellID = nil,    cd = 0,   endTime = 0,   confirmed = false, noKick = false, apiLimit = true  }, -- 추적 불가
+}
+
+local function RunTestMode()
+    CKYN.roster = {}
+    local now   = GetTime()
+
+    -- 본인 실제 데이터
+    local myName = GetShortName("player")
+    if myName then
+        local spellID, confirmed = ResolvePlayerSpell()
+        local cd = 15
+        if spellID then
+            local data = CKYN_SPELLS[spellID]
+            cd = data and data.cd or 15
+        end
+        CKYN.roster["player"] = {
+            name      = myName .. " (나)",
+            class     = select(2, UnitClass("player")) or "WARRIOR",
+            spellID   = spellID,
+            cd        = cd,
+            endTime   = 0,
+            confirmed = confirmed,
+            noKick    = (spellID == nil and confirmed),
+            apiLimit  = false,
+            specID    = nil,
+        }
+    end
+
+    -- 가짜 파티원 주입 (fakeN 키 사용 — party1~4와 겹치지 않게)
+    for i, d in ipairs(TEST_DATA) do
+        local key = "fake" .. i
+        CKYN.roster[key] = {
+            name      = d.name,
+            class     = d.class,
+            spellID   = d.spellID,
+            cd        = d.cd,
+            endTime   = d.endTime > 0 and (now + d.endTime) or 0,
+            confirmed = d.confirmed,
+            noKick    = d.noKick,
+            apiLimit  = d.apiLimit,
+            specID    = nil,
+        }
+    end
+
+    CKYN_UI_ForceShow()
+    Log("|cffaaaaaa테스트 모드 — 실제 M+ 데이터가 아닙니다|r")
+end
+
+-- ================================================================
 -- COMMANDS
 -- /ckn          → 패널 토글
+-- /ckn test     → 테스트 모드 (솔로 UI 확인)
+-- /ckn config   → 설정창 열기
 -- /ckn reset    → 쿨타임 초기화
 -- /ckn reload   → 로스터 재스캔 + 재검사
 -- ================================================================
 SLASH_CKYN1 = "/ckn"
 SlashCmdList["CKYN"] = function(msg)
     local arg = msg and msg:lower():match("^%s*(%S*)") or ""
-    if arg == "reset" then
+    if arg == "test" then
+        RunTestMode()
+    elseif arg == "config" then
+        if CKYN_Options_Open then CKYN_Options_Open() end
+    elseif arg == "reset" then
         for _, entry in pairs(CKYN.roster) do
             entry.endTime = 0
         end
@@ -375,6 +440,23 @@ loader:SetScript("OnEvent", function(self, event, ...)
         local name = ...
         if name ~= ADDON_NAME then return end
         CKYNdb = CKYNdb or {}
+
+        local defaults = {
+            bgAlpha    = 0.85,
+            barTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+            rowHeight  = 28,
+            barHeight  = 14,
+            iconSize   = 24,
+            showIcon   = true,
+            fontSize   = 11,
+            rowSpacing = 2,
+            tooltipOn  = true,
+            autoShow   = true,
+        }
+        for k, v in pairs(defaults) do
+            if CKYNdb[k] == nil then CKYNdb[k] = v end
+        end
+
         CKYN_UI_Init()
         Log("v" .. VERSION .. "  |cff888888/ckn|r")
 

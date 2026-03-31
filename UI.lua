@@ -140,11 +140,18 @@ local rowPool    = {}
 local activeRows = {}
 
 local function MakeRow(parent)
-    local row  = {}
-    local font = GameFontNormalSmall:GetFont()
+    local row      = {}
+    local font     = GameFontNormalSmall:GetFont()
+    local rowH     = (CKYNdb and CKYNdb.rowHeight) or ROW_H
+    local iconSz   = (CKYNdb and CKYNdb.iconSize)  or ICON_SZ
+    local fSize    = (CKYNdb and CKYNdb.fontSize)  or 11
+    local barH     = (CKYNdb and CKYNdb.barHeight) or BAR_H
+    local showIcon = (CKYNdb == nil) or (CKYNdb.showIcon ~= false)
+    local texPath  = (CKYNdb and CKYNdb.barTexture) or "Interface\\TargetingFrame\\UI-StatusBar"
+    local barLeft  = NAME_W + (showIcon and (iconSz + 12) or 4)
 
     row.frame = CreateFrame("Frame", nil, parent)
-    row.frame:SetHeight(ROW_H)
+    row.frame:SetHeight(rowH)
 
     local nameBg = row.frame:CreateTexture(nil, "BACKGROUND")
     nameBg:SetColorTexture(0, 0, 0, 0.3)
@@ -153,20 +160,21 @@ local function MakeRow(parent)
     nameBg:SetWidth(NAME_W)
 
     row.nameText = row.frame:CreateFontString(nil, "OVERLAY")
-    row.nameText:SetFont(font, 11)
+    row.nameText:SetFont(font, fSize)
     row.nameText:SetPoint("LEFT", row.frame, "LEFT", 4, 0)
     row.nameText:SetWidth(NAME_W - 6)
     row.nameText:SetJustifyH("LEFT")
     row.nameText:SetWordWrap(false)
 
     row.icon = row.frame:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(ICON_SZ, ICON_SZ)
+    row.icon:SetSize(iconSz, iconSz)
     row.icon:SetPoint("LEFT", row.frame, "LEFT", NAME_W + 4, 0)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    row.icon:SetShown(showIcon)
 
     local iconHover = CreateFrame("Frame", nil, row.frame)
     iconHover:SetAllPoints(row.icon)
-    iconHover:EnableMouse(true)
+    iconHover:EnableMouse(showIcon)
     iconHover:SetScript("OnEnter", function(self)
         if not row.spellID then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -177,13 +185,13 @@ local function MakeRow(parent)
 
     local barBg = row.frame:CreateTexture(nil, "BACKGROUND")
     barBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
-    barBg:SetPoint("LEFT",  row.frame, "LEFT",  NAME_W + ICON_SZ + 12, -(ROW_H - BAR_H) / 2)
-    barBg:SetPoint("RIGHT", row.frame, "RIGHT", 0,                     -(ROW_H - BAR_H) / 2)
-    barBg:SetHeight(BAR_H)
+    barBg:SetPoint("LEFT",  row.frame, "LEFT",  barLeft, -(rowH - barH) / 2)
+    barBg:SetPoint("RIGHT", row.frame, "RIGHT", 0,       -(rowH - barH) / 2)
+    barBg:SetHeight(barH)
     row.barBg = barBg
 
     local bar = CreateFrame("StatusBar", nil, row.frame)
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar:SetStatusBarTexture(texPath)
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(0)
     bar:SetPoint("TOPLEFT",     barBg, "TOPLEFT",     1, -1)
@@ -191,34 +199,34 @@ local function MakeRow(parent)
     row.bar = bar
 
     row.cdText = bar:CreateFontString(nil, "OVERLAY")
-    row.cdText:SetFont(font, 11)
+    row.cdText:SetFont(font, fSize)
     row.cdText:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
     row.cdText:SetJustifyH("RIGHT")
 
     -- "READY" 텍스트: 바 위에 중앙 정렬, 초록
     row.readyText = bar:CreateFontString(nil, "OVERLAY")
-    row.readyText:SetFont(font, 11)
+    row.readyText:SetFont(font, fSize)
     row.readyText:SetPoint("CENTER", bar, "CENTER", 0, 0)
     row.readyText:SetText("|cff00ff00▶ READY|r")
     row.readyText:Hide()
 
     -- "?" 텍스트: 특성 미확인 상태 (talent=true 타인)
     row.unknownText = bar:CreateFontString(nil, "OVERLAY")
-    row.unknownText:SetFont(font, 11)
+    row.unknownText:SetFont(font, fSize)
     row.unknownText:SetPoint("CENTER", bar, "CENTER", 0, 0)
     row.unknownText:SetText("|cffaaaaaa? 특성 미확인|r")
     row.unknownText:Hide()
 
     -- "없음" 텍스트: 차단 스킬 자체가 없는 직업
     row.noneText = bar:CreateFontString(nil, "OVERLAY")
-    row.noneText:SetFont(font, 11)
+    row.noneText:SetFont(font, fSize)
     row.noneText:SetPoint("CENTER", bar, "CENTER", 0, 0)
     row.noneText:SetText("|cff666666— 차단 없음|r")
     row.noneText:Hide()
 
     -- "API 한계" 텍스트: 흑마법사 등 추적 불가
     row.apiLimitText = bar:CreateFontString(nil, "OVERLAY")
-    row.apiLimitText:SetFont(font, 11)
+    row.apiLimitText:SetFont(font, fSize)
     row.apiLimitText:SetPoint("CENTER", bar, "CENTER", 0, 0)
     row.apiLimitText:SetText("|cff555555— 추적 불가|r")
     row.apiLimitText:Hide()
@@ -311,11 +319,16 @@ local function RebuildRows()
     for _, row in ipairs(activeRows) do ReleaseRow(row) end
     activeRows = {}
 
-    -- unitID 순서 고정: player 먼저, 이후 party1~4
+    -- unitID 순서: player → party1~4 → fake*(테스트 모드)
     local unitOrder = { "player", "party1", "party2", "party3", "party4" }
+    for k in pairs(CKYN.roster) do
+        if k:sub(1, 4) == "fake" then
+            unitOrder[#unitOrder + 1] = k
+        end
+    end
 
-    local rowH = ROW_H
-    local gap  = 2
+    local rowH = (CKYNdb and CKYNdb.rowHeight)  or ROW_H
+    local gap  = (CKYNdb and CKYNdb.rowSpacing) or 2
     local yOff = -(TITLE_H + 4)
 
     for _, unitID in ipairs(unitOrder) do
@@ -374,8 +387,14 @@ function CKYN_UI_Toggle()
     end
 end
 
--- 강제 표시 (자동 표시용)
+-- 강제 표시 (자동 표시용 — M+ 진입 시)
 function CKYN_UI_Show()
+    panel:Show()
+    RebuildRows()
+end
+
+-- 강제 표시 (테스트/설정 미리보기 — 리더 체크 없이)
+function CKYN_UI_ForceShow()
     panel:Show()
     RebuildRows()
 end
@@ -385,7 +404,23 @@ function CKYN_UI_Hide()
     panel:Hide()
 end
 
--- 로그인 시 저장된 위치·크기 복원
+-- 설정 변경 후 Options.lua에서 호출.
+-- 행 풀 초기화 + 배경 재적용 + 재구성.
+-- open=true 이면 패널이 닫혀 있어도 강제로 열어 미리보기.
+function CKYN_UI_ApplySettings(open)
+    for _, row in ipairs(activeRows) do row.frame:Hide() end
+    activeRows = {}
+    wipe(rowPool)
+
+    if panel.SetBackdrop then
+        panel:SetBackdropColor(0.04, 0.04, 0.08, CKYNdb and CKYNdb.bgAlpha or 0.85)
+    end
+
+    if open then panel:Show() end
+    if panel:IsShown() then RebuildRows() end
+end
+
+-- 로그인 시 저장된 위치·크기·배경 복원
 function CKYN_UI_Init()
     if not CKYNdb then return end
     if CKYNdb.panelPos then
@@ -398,5 +433,8 @@ function CKYN_UI_Init()
             math.max(MIN_W, CKYNdb.panelSize.w),
             math.max(MIN_H, CKYNdb.panelSize.h)
         )
+    end
+    if panel.SetBackdrop and CKYNdb.bgAlpha then
+        panel:SetBackdropColor(0.04, 0.04, 0.08, CKYNdb.bgAlpha)
     end
 end

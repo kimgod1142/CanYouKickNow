@@ -202,6 +202,20 @@ local function MakeRow(parent)
     row.readyText:SetText("|cff00ff00▶ READY|r")
     row.readyText:Hide()
 
+    -- "?" 텍스트: 특성 미확인 상태 (talent=true 타인)
+    row.unknownText = bar:CreateFontString(nil, "OVERLAY")
+    row.unknownText:SetFont(font, 11)
+    row.unknownText:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    row.unknownText:SetText("|cffaaaaaa? 특성 미확인|r")
+    row.unknownText:Hide()
+
+    -- "없음" 텍스트: 차단 스킬 자체가 없는 직업
+    row.noneText = bar:CreateFontString(nil, "OVERLAY")
+    row.noneText:SetFont(font, 11)
+    row.noneText:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    row.noneText:SetText("|cff666666— 차단 없음|r")
+    row.noneText:Hide()
+
     return row
 end
 
@@ -213,6 +227,8 @@ local function GetRow(parent)
     row.cdText:SetText("")
     row.cdText:Show()
     row.readyText:Hide()
+    row.unknownText:Hide()
+    row.noneText:Hide()
     return row
 end
 
@@ -229,18 +245,39 @@ updateFrame:SetScript("OnUpdate", function()
     if #activeRows == 0 then return end
     local now = GetTime()
     for _, row in ipairs(activeRows) do
-        if row.endTime and row.endTime > now then
-            -- 쿨타임 중
+        -- 차단 스킬 없는 직업
+        if row.noSpell then
+            row.bar:SetValue(0)
+            row.cdText:Hide()
+            row.readyText:Hide()
+            row.unknownText:Hide()
+            row.noneText:Show()
+
+        -- 특성 미확인 (talent 직업 타인)
+        elseif not row.confirmed then
+            row.bar:SetValue(0)
+            row.cdText:Hide()
+            row.readyText:Hide()
+            row.noneText:Hide()
+            row.unknownText:Show()
+
+        -- 쿨타임 중
+        elseif row.endTime and row.endTime > now then
             local remain = row.endTime - now
             row.bar:SetValue(remain / (row.totalCD or 1))
             row.cdText:SetText(string.format("%.0fs", remain))
             row.cdText:SetTextColor(1, 0.4, 0.4, 1)
             row.cdText:Show()
             row.readyText:Hide()
+            row.unknownText:Hide()
+            row.noneText:Hide()
+
+        -- 사용 가능
         else
-            -- 사용 가능
             row.bar:SetValue(0)
             row.cdText:Hide()
+            row.unknownText:Hide()
+            row.noneText:Hide()
             row.readyText:Show()
         end
     end
@@ -276,9 +313,11 @@ local function RebuildRows()
                 (spellData and spellData.icon) or "Interface\\Icons\\INV_Misc_QuestionMark"
             )
 
-            row.spellID = entry.spellID
-            row.totalCD = entry.cd
-            row.endTime = entry.endTime or 0
+            row.spellID   = entry.spellID
+            row.totalCD   = entry.cd
+            row.endTime   = entry.endTime or 0
+            row.confirmed = entry.confirmed
+            row.noSpell   = (entry.spellID == nil)
 
             activeRows[#activeRows + 1] = row
             yOff = yOff - rowH - gap

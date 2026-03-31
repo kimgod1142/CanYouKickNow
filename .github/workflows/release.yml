@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zip
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ZIP_NAME="CanYouKickNow-${VERSION}.zip"
+
+          mkdir -p /tmp/pkg/CanYouKickNow
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.pkgmeta' \
+            --exclude='DEVLOG.md' \
+            --exclude='CHANGELOG.md' \
+            . /tmp/pkg/CanYouKickNow/
+
+          cd /tmp/pkg
+          zip -r "${GITHUB_WORKSPACE}/${ZIP_NAME}" CanYouKickNow/
+
+          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
+
+      - name: Extract release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found" CHANGELOG.md > release_notes.txt
+          else
+            echo "Release ${VERSION}" > release_notes.txt
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.txt
+          files: ${{ env.ZIP_NAME }}

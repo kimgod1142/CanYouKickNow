@@ -1,0 +1,14 @@
+## Interface: 120001
+## Title: |cff00ff99Can|r|cffffffff You|r|cffff4444Kick|r|cffffffff Now?|r
+## Notes: M+ 파티 차단기 쿨타임 추적 — 애드온 없는 파티원도 감지
+## Version: 1.0.0
+## Author: kimgod1142
+## X-Contact: kimgod1142@gmail.com
+## X-License: MIT
+## X-Curse-Project-ID: 1499477
+
+## SavedVariables: CKYNdb
+
+SpellDB.lua
+UI.lua
+CanYouKickNow.lua

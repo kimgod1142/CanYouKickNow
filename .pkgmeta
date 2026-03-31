@@ -1,0 +1,8 @@
+package-as: CanYouKickNow
+
+ignore:
+  - .pkgmeta
+  - .github
+  - .gitignore
+  - DEVLOG.md
+  - CHANGELOG.md

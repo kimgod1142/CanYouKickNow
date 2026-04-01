@@ -1,0 +1,100 @@
+<h2>CanYouKickNow?</h2>
+<p>Real-time interrupt cooldown tracker for Mythic+ — <strong>works even without the addon on party members.</strong></p>
+<p>Uses <code>UnitClass()</code> to build a roster automatically on dungeon entry, then confirms talent choices via Inspect. No chat spam, no addon required on others.</p>
+
+<h3>Key Features</h3>
+<ul>
+  <li><strong>No addon required on others</strong> — detects casts via <code>UNIT_SPELLCAST_SUCCEEDED</code>, no inter-addon communication needed.</li>
+  <li><strong>Spec-aware via Inspect</strong> — inspects party members at dungeon start to confirm whether their interrupt is talented.</li>
+  <li><strong>Auto show/hide</strong> — panel appears on Mythic+ entry, hides on exit.</li>
+  <li><strong>Live cooldown bars</strong> — class-colored, updates every frame.</li>
+  <li><strong>Spec correction on cast</strong> — if a Hunter uses Muzzle instead of Counter Shot, the tracker corrects itself immediately.</li>
+  <li><strong>Full settings panel</strong> — <code>/ckn config</code> opens options for bar texture, row size, font, and more.</li>
+  <li><strong>Solo test mode</strong> — <code>/ckn test</code> shows all 5 UI states without needing a group.</li>
+  <li><strong>English / Korean UI</strong> — auto-switches by client locale.</li>
+</ul>
+
+<h3>Panel States</h3>
+<table>
+  <tr><th>Display</th><th>Meaning</th></tr>
+  <tr><td>▶ READY</td><td>Interrupt confirmed, off cooldown</td></tr>
+  <tr><td>15s</td><td>On cooldown, counting down</td></tr>
+  <tr><td>? 특성 미확인</td><td>Talented interrupt — awaiting Inspect or first cast</td></tr>
+  <tr><td>— 차단 없음</td><td>No interrupt for this spec</td></tr>
+  <tr><td>— 추적 불가</td><td>Warlock — pet-based, not trackable via WoW API</td></tr>
+</table>
+
+<h3>Tracked Interrupts</h3>
+<table>
+  <tr><th>Class / Spec</th><th>Spell</th><th>CD</th><th>Talented?</th></tr>
+  <tr><td>Warrior (all)</td><td>Pummel</td><td>15s</td><td>No</td></tr>
+  <tr><td>Paladin (Prot / Ret)</td><td>Rebuke</td><td>15s</td><td>Yes</td></tr>
+  <tr><td>Paladin (Holy)</td><td>—</td><td>—</td><td>No interrupt</td></tr>
+  <tr><td>Hunter (BM / MM)</td><td>Counter Shot</td><td>24s</td><td>Yes</td></tr>
+  <tr><td>Hunter (SV)</td><td>Muzzle</td><td>15s</td><td>Yes</td></tr>
+  <tr><td>Rogue (all)</td><td>Kick</td><td>15s</td><td>No</td></tr>
+  <tr><td>Priest (Shadow)</td><td>Silence</td><td>30s</td><td>No</td></tr>
+  <tr><td>Priest (Disc / Holy)</td><td>—</td><td>—</td><td>No interrupt</td></tr>
+  <tr><td>Death Knight (all)</td><td>Mind Freeze</td><td>15s</td><td>Yes</td></tr>
+  <tr><td>Shaman (all)</td><td>Wind Shear</td><td>12s</td><td>Yes</td></tr>
+  <tr><td>Mage (all)</td><td>Counterspell</td><td>25s</td><td>No</td></tr>
+  <tr><td>Warlock (all)</td><td>—</td><td>—</td><td>API limit</td></tr>
+  <tr><td>Monk (Brew / WW)</td><td>Spear Hand Strike</td><td>15s</td><td>Yes</td></tr>
+  <tr><td>Monk (MW)</td><td>—</td><td>—</td><td>No interrupt</td></tr>
+  <tr><td>Druid (Balance)</td><td>Solar Beam</td><td>60s</td><td>Yes</td></tr>
+  <tr><td>Druid (Feral / Guardian)</td><td>Skull Bash</td><td>15s</td><td>Yes</td></tr>
+  <tr><td>Druid (Resto)</td><td>—</td><td>—</td><td>No interrupt</td></tr>
+  <tr><td>Demon Hunter (all)</td><td>Disrupt</td><td>15s</td><td>No</td></tr>
+  <tr><td>Evoker (Dev / Aug)</td><td>Quell</td><td>20s</td><td>Yes</td></tr>
+  <tr><td>Evoker (Preservation)</td><td>—</td><td>—</td><td>No interrupt</td></tr>
+</table>
+
+<h3>Commands</h3>
+<table>
+  <tr><th>Command</th><th>Description</th></tr>
+  <tr><td><code>/ckn</code></td><td>Toggle tracker panel</td></tr>
+  <tr><td><code>/ckn config</code></td><td>Open settings panel</td></tr>
+  <tr><td><code>/ckn test</code></td><td>Load dummy data for solo UI testing</td></tr>
+  <tr><td><code>/ckn reset</code></td><td>Clear all cooldown data</td></tr>
+  <tr><td><code>/ckn reload</code></td><td>Re-scan roster + re-inspect party</td></tr>
+</table>
+
+<h3>Known Limitations</h3>
+<ul>
+  <li><strong>Warlock</strong> interrupts are pet-based and not exposed via standard player unit events — tracking is not possible with the current WoW API.</li>
+  <li><strong>Death Knight Coldthirst</strong> (−3s per successful interrupt) is event-driven and cannot be tracked.</li>
+  <li><strong>Talented interrupts</strong> show <code>?</code> until Inspect completes (~30 yard range required) or the player casts the interrupt.</li>
+</ul>
+
+<hr/>
+
+<h2>CanYouKickNow? (한국어)</h2>
+<p>M+ 파티 차단기 쿨타임 실시간 추적 애드온 — <strong>상대방 애드온 없이도 동작합니다.</strong></p>
+<p><code>UnitClass()</code>로 파티원 클래스를 자동 감지하고, Inspect로 특성 보유 여부를 확인합니다. 공대 채팅 스팸 없음.</p>
+
+<h3>주요 기능</h3>
+<ul>
+  <li><strong>상대방 애드온 불필요</strong> — <code>UNIT_SPELLCAST_SUCCEEDED</code>로 감지, 애드온 간 통신 필요 없음.</li>
+  <li><strong>Inspect 기반 특성 확인</strong> — 던전 진입 시 자동으로 파티원 검사, 차단 특성 보유 여부 확정.</li>
+  <li><strong>자동 표시/숨김</strong> — M+ 진입 시 자동 표시, 이탈 시 자동 숨김.</li>
+  <li><strong>실시간 쿨타임 바</strong> — 직업 색상, 매 프레임 업데이트.</li>
+  <li><strong>스펙 자동 교정</strong> — 실제 사용 스킬 기준으로 스펙 추정 자동 수정.</li>
+  <li><strong>설정 패널</strong> — <code>/ckn config</code>로 바 텍스처, 크기, 폰트 등 조정.</li>
+  <li><strong>솔로 테스트 모드</strong> — <code>/ckn test</code>로 혼자서도 UI 전체 상태 확인.</li>
+</ul>
+
+<h3>명령어</h3>
+<table>
+  <tr><th>명령어</th><th>설명</th></tr>
+  <tr><td><code>/ckn</code></td><td>패널 토글</td></tr>
+  <tr><td><code>/ckn config</code></td><td>설정창 열기</td></tr>
+  <tr><td><code>/ckn test</code></td><td>솔로 UI 테스트</td></tr>
+  <tr><td><code>/ckn reset</code></td><td>쿨타임 초기화</td></tr>
+  <tr><td><code>/ckn reload</code></td><td>로스터 재스캔 + 재검사</td></tr>
+</table>
+
+<h3>주의 사항</h3>
+<ul>
+  <li><strong>흑마법사</strong>는 펫 기반 차단으로 WoW API 한계상 추적 불가.</li>
+  <li><strong>특성 차단 스킬</strong>은 Inspect 완료 전까지 <code>?</code> 상태로 표시 (30야드 이내 필요).</li>
+</ul>
